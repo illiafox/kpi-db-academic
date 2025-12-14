@@ -1,0 +1,175 @@
+
+Enum "facility_type" {
+  "supermarket"
+  "warehouse"
+}
+
+Enum "purchase_order_status" {
+  "processing_by_supplier"
+  "shipped"
+  "received"
+}
+
+Table "product_categories" {
+  "category_id" SERIAL [pk, increment]
+  "parent_id" INTEGER
+  "name" TEXT [unique, not null]
+  "description" TEXT
+}
+
+Table "manufacturers" {
+  "manufacturer_id" SERIAL [pk, increment]
+  "name" TEXT [unique, not null]
+  "country" TEXT
+}
+
+Table "products" {
+  "product_id" SERIAL [pk, increment]
+  "category_id" INTEGER [not null]
+  "manufacturer_id" INTEGER
+  "code" TEXT [unique, not null]
+  "name" TEXT [not null]
+  "pack_weight_g" INTEGER [not null, check: `pack_weight_g > 0`]
+  "description" TEXT
+  "price" MONEY [not null, check: `price > 0::money`]
+  "added_at" TIMESTAMPTZ [not null, default: `now()`]
+  "updated_at" TIMESTAMPTZ [not null, default: `now()`]
+
+  Indexes {
+    category_id [name: "product_category_idx"]
+    manufacturer_id [name: "product_manufacturer_idx"]
+    `to_tsvector('simple',coalesce(name,'')||' '||coalesce(description,'')||' '||coalesce(code,''))` [type: gin, name: "product_fts_gin_idx"]
+  }
+}
+
+Table "suppliers" {
+  "supplier_id" SERIAL [pk, increment]
+  "name" TEXT [unique, not null]
+  "phone_main" TEXT [not null]
+  "representative_name" TEXT [not null]
+  "address" TEXT [not null]
+  "city" TEXT [not null]
+  "region" TEXT
+  "postal_code" TEXT [not null]
+  "latitude" DOUBLEPRECISION [check: `latitude BETWEEN -90 AND 90`]
+  "longitude" DOUBLEPRECISION [check: `longitude BETWEEN -180 AND 180`]
+  "added_at" TIMESTAMPTZ [not null, default: `now()`]
+  "updated_at" TIMESTAMPTZ [not null, default: `now()`]
+
+  Indexes {
+    `ll_to_earth(latitude,longitude)` [type: gist, name: "supplier_earth_gist_idx"]
+    city [name: "supplier_city_idx"]
+    postal_code [name: "supplier_postal_idx"]
+  }
+}
+
+Table "supplier_products" {
+  "supplier_id" INTEGER [not null]
+  "product_id" INTEGER [not null]
+  "is_active" BOOLEAN [not null, default: TRUE]
+  "available_units" INTEGER [not null, check: `available_units >= 0`, default: 0]
+  "price" MONEY [not null, check: `price >= 0::money`]
+  "added_at" TIMESTAMPTZ [not null, default: `now()`]
+  "updated_at" TIMESTAMPTZ [not null, default: `now()`]
+
+  Indexes {
+    (supplier_id, product_id) [pk]
+    supplier_id [name: "supplier_product_supplier_idx"]
+    product_id [name: "supplier_product_product_idx"]
+  }
+}
+
+Table "supplier_price_history" {
+  "price_id" SERIAL [pk, increment]
+  "supplier_id" INTEGER [not null]
+  "product_id" INTEGER [not null]
+  "price" MONEY [not null, check: `price >= 0::money`]
+  "note" TEXT
+}
+
+Table "facilities" {
+  "facility_id" SERIAL [pk, increment]
+  "type" facility_type [not null]
+  "name" TEXT [unique, not null]
+  "address_line1" TEXT [not null]
+  "address_line2" TEXT
+  "city" TEXT [not null]
+  "region" TEXT
+  "postal_code" TEXT [not null]
+  "country_code" "CHAR (2)" [not null]
+  "latitude" DOUBLEPRECISION [check: `latitude BETWEEN -90 AND 90`]
+  "longitude" DOUBLEPRECISION [check: `longitude BETWEEN -180 AND 180`]
+
+  Indexes {
+    type [name: "facility_type_idx"]
+    city [name: "facility_city_idx"]
+    `ll_to_earth(latitude,longitude)` [type: gist, name: "facility_earth_gist_idx"]
+  }
+}
+
+Table "facility_inventory" {
+  "facility_id" INTEGER [not null]
+  "product_id" INTEGER [not null]
+  "qty_units" INTEGER [not null, check: `qty_units >= 0`, default: 0]
+
+  Indexes {
+    (facility_id, product_id) [pk]
+    product_id [name: "facility_inventory_product_idx"]
+  }
+}
+
+Table "purchase_orders" {
+  "order_id" SERIAL [pk, increment]
+  "supplier_id" INTEGER [not null]
+  "facility_id" INTEGER [not null]
+  "status" purchase_order_status [not null, default: 'processing_by_supplier']
+  "total_amount" MONEY [not null, check: `total_amount >= 0::money`, default: 0]
+  "added_at" TIMESTAMPTZ [not null, default: `now()`]
+  "note" TEXT
+
+  Indexes {
+    supplier_id [name: "purchase_order_supplier_idx"]
+    facility_id [name: "purchase_order_facility_idx"]
+    status [name: "purchase_order_status_idx"]
+  }
+}
+
+Table "purchase_order_items" {
+  "order_id" INTEGER [not null]
+  "product_id" INTEGER [not null]
+  "qty_units" INTEGER [not null, check: `qty_units > 0`]
+  "unit_price" MONEY [not null, check: `unit_price >= 0::money`]
+  "total_price" MONEY [not null, check: `total_price >= 0::money`]
+
+  Indexes {
+    (order_id, product_id) [pk]
+    product_id [name: "purchase_order_item_product_idx"]
+  }
+}
+
+Ref:"product_categories"."category_id" < "product_categories"."parent_id" [delete: set null]
+
+Ref:"product_categories"."category_id" < "products"."category_id" [delete: restrict]
+
+Ref:"manufacturers"."manufacturer_id" < "products"."manufacturer_id" [delete: set null]
+
+Ref:"suppliers"."supplier_id" < "supplier_products"."supplier_id" [delete: cascade]
+
+Ref:"products"."product_id" < "supplier_products"."product_id" [delete: cascade]
+
+Ref:"suppliers"."supplier_id" < "supplier_price_history"."supplier_id" [delete: cascade]
+
+Ref:"products"."product_id" < "supplier_price_history"."product_id" [delete: cascade]
+
+Ref:"facilities"."facility_id" < "facility_inventory"."facility_id" [delete: cascade]
+
+Ref:"products"."product_id" < "facility_inventory"."product_id" [delete: cascade]
+
+Ref:"suppliers"."supplier_id" < "purchase_orders"."supplier_id" [delete: restrict]
+
+Ref:"facilities"."facility_id" < "purchase_orders"."facility_id" [delete: restrict]
+
+Ref:"purchase_orders"."order_id" < "purchase_order_items"."order_id" [delete: cascade]
+
+Ref:"products"."product_id" < "purchase_order_items"."product_id" [delete: restrict]
+
