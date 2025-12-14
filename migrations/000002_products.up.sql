@@ -37,8 +37,5 @@ CREATE INDEX product_manufacturer_idx ON products (manufacturer_id);
 CREATE INDEX product_fts_gin_idx
     ON products
         USING GIN (
-                   to_tsvector(
-                           'simple',
-                           coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(code, '')
-                   )
+                   to_tsvector('simple', name || ' ' || coalesce(description,'') || ' ' || code)
             );
