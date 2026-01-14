@@ -1,6 +1,5 @@
 -- Закупки по статусу
 SELECT po.order_id,
-       po.added_at,
        po.total_amount,
        s.name AS supplier_name,
        f.name AS facility_name

@@ -4,5 +4,5 @@ FROM facility_inventory fi
 JOIN facilities f ON f.facility_id = fi.facility_id
 JOIN products p   ON p.product_id  = fi.product_id
 WHERE fi.qty_units <= 50
-ORDER BY fi.qty_units ASC, p.name
+ORDER BY fi.qty_units, p.name
 LIMIT 20;

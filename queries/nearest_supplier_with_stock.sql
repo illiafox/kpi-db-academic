@@ -2,11 +2,9 @@
 WITH q AS (SELECT 50.4501::double precision AS lat,
                   30.5234::double precision AS lon,
                   3202                       AS product_id)
-SELECT s.supplier_id,
-       s.name,
+SELECT s.name,
        s.city,
        sp.available_units,
-       sp.price,
        ROUND((
                  earth_distance(
                          ll_to_earth(s.latitude, s.longitude),

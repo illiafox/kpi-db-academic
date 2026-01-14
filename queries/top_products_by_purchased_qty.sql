@@ -6,4 +6,4 @@ JOIN products p ON p.product_id = i.product_id
 JOIN purchase_orders po ON po.order_id = i.order_id
 GROUP BY p.product_id
 ORDER BY total_qty_units DESC
-LIMIT 10;
+LIMIT 50;
